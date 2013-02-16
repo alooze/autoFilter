@@ -75,6 +75,11 @@ abstract class OptionsMap {
 
     //устанавливаем флаг загрузки предыдущего состояния
     $this->loadStateNeedCheck();
+
+    //передаем при необходимости объект в свойство $modx
+    if ($param['toModx']) {
+      $modx->opt = &$this;
+    }
   }
 
 
@@ -161,6 +166,11 @@ abstract class OptionsMap {
         $this->filters = array_merge($this->filters, array_keys($res)); //имена шаблонов
       }
     }
+
+    //для режима EP дописываем в массив слово ep
+    /*if ($this->param['mode'] == 'ep') {
+      $this->filters[] = 'ep';
+    }*/
     return true;
   }
 
@@ -314,7 +324,9 @@ abstract class OptionsMap {
               $retCode = $funcName($this, $tpl, $optId, $filterAr[$reqKey.'_'.$filterKey]);
               $retPhAr[$optName.'_'.$filterKey] = $retCode;
             } else {
-              $retPhAr[$optName.'_'.$filterKey] = 'no function found';
+              if ($this->param['mode'] != 'ep') {
+                $retPhAr[$optName.'_'.$filterKey] = 'no function found';
+              }
             }
           }
         } else {
@@ -492,7 +504,12 @@ abstract class OptionsMap {
       return 0;
     }
 
-    $values = array_keys($this->map[$optId]);
+    if ($this->param['hideImpossible'] == '1') {
+      $values = array_keys($this->currentMap[$optId]);
+    } else {
+      $values = array_keys($this->map[$optId]);
+    }
+    
     natsort($values);
     $values = array_values($values); //для старых версий php не работают флаги
 
@@ -987,7 +1004,7 @@ class OptionsMapEp extends OptionsMap {
     //данные по расширенным параметрам
     $query = "SELECT c.id did, c.pagetitle, c.longtitle, c.parent, c.template, p.pagetitle AS ptitle, ";
     $query.= " ptvv.epid, ptvv.itemid, ptvv.value, ";
-    $query.= " ptv.frontend_type, ptv.name, ptv.catid ";
+    $query.= " ptv.frontend_type, ptv.name, ptv.catid, pte.elements ";
     $query.= " FROM ".$modx->getFullTableName('site_content')." c ";
     $query.= " LEFT JOIN ".$modx->getFullTableName('site_content')." p ";
     $query.= " ON p.id=c.parent ";
@@ -995,13 +1012,15 @@ class OptionsMapEp extends OptionsMap {
     $query.= " ON c.id=ptvv.itemid ";
     $query.= " LEFT JOIN ".$modx->getFullTableName('ep_params')." ptv ";
     $query.= " ON ptv.id=ptvv.epid ";
+    $query.= " LEFT JOIN ".$modx->getFullTableName('ep_params_elements')." pte ";
+    $query.= " ON pte.epid=ptv.id ";
     $query.= " WHERE c.id IN (".$ids.") ";
 
     if ($this->param['skipFolders'] == 1) {
       $query.= " AND c.isfolder=0 ";
     }
 
-    $query.= "ORDER BY ptvv.itemid ";
+    $query.= "ORDER BY ptv.rank ";
     $res = $modx->db->query($query);
 
     while ($row = $modx->db->getRow($res)) {
@@ -1023,6 +1042,7 @@ class OptionsMapEp extends OptionsMap {
       if (!isset($retAr['options']['ep'.$row['epid']])) {
         $retAr['options']['ep'.$row['epid']]['frontend_type'] = $row['type'];
         $retAr['options']['ep'.$row['epid']]['name'] = $row['name'];
+        $retAr['options']['ep'.$row['epid']]['elements'] = $row['elements'];
       }
 
     }
@@ -1052,7 +1072,7 @@ class OptionsMapEp extends OptionsMap {
   }
 
   /**
-  ** Возвращает шаблон с заменой [+optepNN_ep+] на список [+optepNN_TYPE+]
+  ** Возвращает шаблон с заменой [+optNN_ep+] на список [+optepNN_TYPE+]
   ** @param: $tpl - шаблон формы
   **/
   function preParse($tpl) {
@@ -1065,27 +1085,38 @@ class OptionsMapEp extends OptionsMap {
       //$itemIds = $this->param['ids'];
       //$catAr = explode(',', $itemIds);
       $catAr = $this->getAllItems();
+      //print_r($catAr);
 
       $cat = isset($this->items[$catAr[0]]['parent']) ? $this->items[$catAr[0]]['parent'] : '';
       if (trim($cat) == '') {
         $catEps = '';
       } else {
+        //echo "\$catEps = fGetCatEps($cat);";
         $catEps = fGetCatEps($cat);
       }
-      /*print_r($catEps);
-      die();*/
+      //print_r($catEps);
+      //die();
 
 
 
       if (is_array($catEps) && count($catEps) > 0) {
+        $epTpl = $this->parser->strToTpl($this->param['epItemTpl']);
+
         foreach ($catEps as $epAr) {
-          /*print_r($epAr);
-          die();*/
-          $retCode.= '<div id="ep'.$epAr['id'].'">
+          //print_r($epAr);
+          //die();
+          $phe['epvalues'] = '[+'.$this->param['id'].'.optep'.$epAr['id'].'_'.$epAr['frontend_type'].'+]';
+          $phe['epid'] = $epAr['id'];
+          $phe['epname'] = $epAr['name'];
+          $phe['epftype'] = $epAr['frontend_type'];
+          $phe['id'] = $this->param['id'];
+
+          /*$retCode.= '<div id="ep'.$epAr['id'].'">
             <span class="epname">'.$epAr['name'].': </span>
             [+'.$this->param['id'].'.optep'.$epAr['id'].'_'.$epAr['frontend_type'].'+]
-          </div><br />
-              ';
+          </div><br />[+id+].optep[+epid+]_[+epftype+]
+              ';*/
+          $retCode.= $this->parser->quickParseTpl($epTpl, $phe);
         }
       }
       /*echo $retCode;
@@ -1094,7 +1125,7 @@ class OptionsMapEp extends OptionsMap {
       foreach ($this->options as $optId => $optAr) {
         /*echo $optId." \n";
         print_r($optAr);*/
-        if (isset($optAr['type']) && $optAr['type'] == 'custom_tv') {
+        if (isset($optAr['type']) && $optAr['type'] == 'custom_tv' && $optAr['name'] == 'ptv') {
           $tpl = str_replace('[+'.$this->param['id'].'.opt'.$optId.'_ep+]', $retCode, $tpl);
         }
       }

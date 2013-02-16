@@ -35,7 +35,11 @@ CODE;
 
 $tpl['checkboxes'] = <<<CODE
   [+loop+]
-    <label>[+value+] <input class="chckbox[+hidden+]" type="checkbox" name="[+name+]_checkboxes[]" value="[+value+]" [+checked+] /> </label><br />
+    
+                        <div class="clearfix row">
+                      <input type="checkbox" class="manageform" name="[+name+]_checkboxes[]" id="[+name+][+iteration+]" value="[+value+]" [+checked+] >
+                      <label for="[+name+][+iteration+]">[+value+]</label>
+                    </div>
   [+end_loop+]
 CODE;
 

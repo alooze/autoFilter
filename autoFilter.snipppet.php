@@ -3,7 +3,7 @@
  * autoFilter snippet
  * Данный файл является частью расширения autoFilter для MODX Evolution
  * @Author: alooze (a.looze@gmail.com)
- * @Version: 0.7a
+ * @Version: 0.8a
  * @Date: 05.01.2013
  */
 
@@ -25,6 +25,7 @@ $itemIds = isset($itemIds) ? $itemIds : ''; //товары через запят
  * В зависимости от режима формируем список товаров для фильтрации
  */
 $config['mode'] = isset ($mode) ? $mode : 'base';
+$config['scanLevel'] = isset($scanLevel) ? $scanLevel : ''; //глубина сканирования каталога
 
 switch ($config['mode']) {
   case 'shopkeeper':
@@ -34,7 +35,7 @@ switch ($config['mode']) {
     $parAr = explode(',', $parents);
     foreach ($parAr as $parId) {
       if (intval($parId) > 0) {
-        $chAr = $modx->getChildIds($parId);
+        $chAr = $modx->getChildIds($parId, $config['scanLevel']);
         if (is_array($chAr)) {
           $parentsAr[] = implode(',', $chAr);
         }
@@ -69,15 +70,17 @@ switch ($config['mode']) {
   case 'base':
   default:
     //выборка товаров из дерева MODX, опциями являются TV
+    $itemIdsAr = array();
     $parAr = explode(',', $parents);
     foreach ($parAr as $parId) {
       if (intval($parId) > 0) {
         $chAr = $modx->getChildIds($parId);
         if (is_array($chAr)) {
-          $itemIds.= implode(',', $chAr);
+          $itemIdsAr[] = implode(',', $chAr);
         }
       }
     }
+    $itemIds = implode(',', $itemIdsAr);
   break;
 }
 
@@ -101,6 +104,7 @@ $config['parentTvSplitter'] = isset($parentTvSplitter) ? $parentTvSplitter : ','
 
 $config['confFile'] = isset($confFile) ? $confFile : $path.'config.inc.txt';
 $config['skipFolders'] = isset($skipFolders) ? $skipFolders : 1; //не включать папки
+
 $config['includeTv'] = isset($includeTv) ? $includeTv : ''; //включать TV
 $config['excludeTv'] = isset($excludeTv) ? $excludeTv : ''; //исключать TV
 $config['id'] = isset($id) ? $id : 'af'; //id вызова сниппета на странице
@@ -128,14 +132,17 @@ $config['delim'] = isset($delim) ? $delim : ',';
 //параметры вывода данных (шаблоны)
 $config['showForm'] = isset($showForm) ? $showForm : 1; //показывать форму фильтрации
 $config['formTpl'] = isset ($formTpl) ? $formTpl : '@FILE '.$config['path'].'templates/formTpl.inc.php'; //шаблон формы фильтрации
-
+$config['epItemTpl'] = isset ($epItemTpl) ? $epItemTpl : '@CODE <div id="ep[+epid+]"><span class="epname">[+epname+]: </span>[+epvalues+]</div><br />'; //шаблон для формирования раширенных параметров
 $config['parseTpl'] = isset($parseTpl) ? $parseTpl : '@CODE Найдены [+'.$config['id'].'.items_show_count+] товаров из [+'.$config['id'].'.items_count+]: ids = [+'.$config['id'].'.items_str+]'; //чанк для вывода результата
+
 
 $config['showResultOnRun'] = isset($showResultOnRun) ? $showResultOnRun : '1'; //показывать результаты при первой загрузке
 
 $config['noEmptyIds'] = isset($noEmptyIds) ? $noEmptyIds : '0'; //не допускать пустой строки с id (будет заменяться '00')
 
+/** скрытые опции **/
 $config['where'] = isset($where) ? $where : ''; //для предварительной фильтрации при выборке из БД
+$config['toModx'] = isset($toModx) ? (bool)$toModx : false; //передавать объект opt в свойство $modx или нет
 
 //3. Формируем вывод в отдельном файле
 include_once $path.'autoFilter.inc.php';

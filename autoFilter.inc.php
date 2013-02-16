@@ -78,6 +78,8 @@ if ($dataAr = $opt->getCachedResult()) {
   $formBlockTpl = $opt->parser->strToTpl($config['formTpl']);
 
   //предварительная подготовка шаблонов для расширенных параметров
+  //echo $formBlockTpl;
+  //echo '<br><br>';
   $formBlockTpl = $opt->preParse($formBlockTpl);
   //die($formBlockTpl);
   //получаем ключи фильтров из формы фильтрации

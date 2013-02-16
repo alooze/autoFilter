@@ -50,6 +50,10 @@ class TemplateParser {
     return ('Невозможно обработать шаблон');
   }
 
+  function quickParseTpl($tpl, array $phs) {
+    return $this->parseTpl($tpl, array_keys($phs), array_values($phs));
+  }
+
   function printOutput() {
     //echo $this->output;
     echo $this->stripTags($this->output);

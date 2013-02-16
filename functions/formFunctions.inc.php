@@ -20,22 +20,33 @@ if (!function_exists('fToArray')) {
 ///////получение массива опций из строки возможных значений
 //для товаров = документам MODX
 if (!function_exists('fGetOpt')) {
-  function fGetOpt($optVal) {
+  function fGetOpt($optVal, $type='') {
     //echo $optVal;
-    if (!strpos($optVal, '||')) {
-      return $optVal;
-    } else {
+    //для расширенных параметров просто разбиваем значения по \n
+    if ($type == 'ep') {
       $retAr = array();
-      $optAr = explode('||', $optVal);
+      $optAr = explode("\n", $optVal);
       foreach ($optAr as $option) {
-        if (!strpos($optVal, '==')) {
-          $retAr[$option] = $option;
-        } else {
-          list($name, $val) = explode('==', $option);
-          $retAr[trim($val)] = trim($name);
-        }
+        $option = trim($option);
+        $retAr[$option] = $option;
       }
       return $retAr;
+    } else {
+      if (!strpos($optVal, '||')) {
+        return $optVal;
+      } else {
+        $retAr = array();
+        $optAr = explode('||', $optVal);
+        foreach ($optAr as $option) {
+          if (!strpos($optVal, '==')) {
+            $retAr[$option] = $option;
+          } else {
+            list($name, $val) = explode('==', $option);
+            $retAr[trim($val)] = trim($name);
+          }
+        }
+        return $retAr;
+      }
     }
   }
 }
@@ -348,7 +359,12 @@ if (!function_exists('checkboxes_parser')) {
     $filterVal = fToArray($filterVal);
 
     //получаем значения
-    $optValAr = fGetOpt($opt->options[$optId]['elements']);
+    if (substr($optId, 0, 2) == 'ep') {
+      $optValAr = fGetOpt($opt->options[$optId]['elements'], 'ep');
+    } else {
+      $optValAr = fGetOpt($opt->options[$optId]['elements']);
+    }
+    
 
     if (isset($opt->param['fields']['opt'.$optId])) {
       $optName = $opt->param['fields']['opt'.$optId];
@@ -358,11 +374,21 @@ if (!function_exists('checkboxes_parser')) {
 
     if (!is_array($opt->map[$optId])) return '';
     $tmpAr = array_keys($opt->map[$optId]);
-    natsort($tmpAr);
+    //сортируем пункты - выстраиваем их в том порядке, который задан в перечне элементов в админке
+    //natsort($tmpAr);
+    $tmpAr2 = array();
+    foreach ($optValAr as $key=>$val) {
+      if (in_array($val, $tmpAr)) {
+        $tmpAr2[] = $val;
+      }
+    }
 
-    foreach ($tmpAr as $optVal) {
+    $iteration = 1;
+
+    foreach ($tmpAr2 as $optVal) {
       if ($optVal == '---' || $optVal == '') continue;
       $ph['value'] = $optVal;
+      $ph['iteration'] = $iteration++;
       $ph['valname'] = $optValAr[$optVal];
       $ph['name'] = $optName;
       if (in_array($optVal, $filterVal)) {
@@ -543,9 +569,11 @@ if (!function_exists('minmax_filter')) {
 if (!function_exists('fGetCatEps')) {
   function fGetCatEps($cat) {
     global $modx;
+    $cat = intval($cat);
+    if ($cat < 1) return array(); //die('err');
 
     $ret = array();
-    $res = $modx->db->select('*', $modx->getFullTableName('ep_params'), 'catid='.$cat.' AND in_filters=1');
+    $res = $modx->db->select('*', $modx->getFullTableName('ep_params'), 'catid='.$cat.' AND in_filters=1','rank');
     while($row = $modx->db->getRow($res)) {
       switch ($row['frontend_type']) {
         case '1': $row['frontend_type'] = 'select'; break;
@@ -561,8 +589,8 @@ if (!function_exists('fGetCatEps')) {
 }
 
 //////////////////функции не используются, но пока пусть будут
-if (!function_exists('ep_request')) {
-  function ep_request(&$opt, $key) {
+if (!function_exists('ep_request1')) {
+  function ep_request1(&$opt, $key) {
     global $modx;
     $filterAr = array();
 
@@ -582,8 +610,8 @@ if (!function_exists('ep_request')) {
   }
 }
 
-if (!function_exists('ep_parser')) {
-  function ep_parser(&$opt, $code, $optId, $filterVal) {
+if (!function_exists('ep_parser1')) {
+  function ep_parse1(&$opt, $code, $optId, $filterVal) {
     $retCode = '';
 
     //берем родителя первого из товаров в качестве категории
@@ -620,8 +648,8 @@ if (!function_exists('ep_parser')) {
   }
 }
 
-if (!function_exists('ep_filter')) {
-  function ep_filter(&$opt, $optId, $filterVal) {
+if (!function_exists('ep_filter1')) {
+  function ep_filter1(&$opt, $optId, $filterVal) {
     $retIdsAr = array();
     $filterVal = fToArray($filterVal);
 
