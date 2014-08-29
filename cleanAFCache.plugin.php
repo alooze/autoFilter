@@ -25,4 +25,4 @@ if ($e->name == 'OnSiteRefresh'){
     $output.= "директория <b>".$dirName."</b> не найдена";
   }
 }
-echo $output;
+echo (isset($_REQUEST['a']) && $_REQUEST['a'] == 26 && IN_MANAGER_MODE) ? $output : '';
